@@ -1,15 +1,20 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Link, ReactNode } from '@tanstack/react-router'
-import { ShowError } from 'components/errors'
-import Loading from 'components/loading'
-import SuccessCheckmark from 'components/SuccessCheckmark'
-import { useAuth } from 'lib/hooks'
-import languages from 'lib/languages'
-import supabase from 'lib/supabase-client'
-import { useProfile } from 'lib/use-profile'
-import { cn } from 'lib/utils'
 import { type FormEvent, SyntheticEvent, useState } from 'react'
 import toast from 'react-hot-toast'
+import { createFileRoute, Link, ReactNode } from '@tanstack/react-router'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+
+import { ArrowLeftIcon, ArrowRightIcon, PlusIcon } from 'lucide-react'
+import { Button, buttonVariants } from 'components/ui/button'
+import { Input } from 'components/ui/input'
+import { Label } from 'components/ui/label'
+
+import supabase from 'lib/supabase-client'
+import { useAuth } from 'lib/hooks'
+import { useProfile } from 'lib/use-profile'
+import { ShowError } from 'components/errors'
+import Loading from 'components/loading'
+import languages from 'lib/languages'
+import SuccessCheckmark from 'components/SuccessCheckmark'
 
 export const Route = createFileRoute('/_user/getting-started')({
 	component: GettingStartedPage,
@@ -99,52 +104,60 @@ function GettingStartedPage() {
 
 	// if (mainForm.error) console.log(`Error logging:`, mainForm)
 	if (mainForm.isSuccess) return <ShowSuccess tempDeckToAdd={tempDeckToAdd} />
-	if (profile.isPending) return <Loading />
-	if (!profile.data) return <>no data; you are nicht profile-y: "{userId}"</>
 	const { deckLanguages } = profile.data
 
 	return (
-		<>
-			<main className="p2 text-white md:p-6 lg:p-10">
-				<h1 className="d1 @md:text-center">Welcome to Sunlo</h1>
-				<div className="w-app">
-					<p className="my-4 mb-10 text-2xl @md:text-center">
-						Let&apos;s get started
-					</p>
-					<SetUsernameStep value={tempUsernameToUse} set={setTempUsername} />
-					<SetPrimaryLanguageStep
-						value={tempLanguagePrimaryToUse}
-						set={setTempLanguagePrimary}
-					/>
-					<CreateFirstDeckStep value={tempDeckToAdd} set={setTempDeckToAdd} />
-					{(
-						tempLanguagePrimaryToUse &&
-						(tempDeckToAdd || deckLanguages?.length > 0) &&
-						tempUsernameToUse
-					) ?
-						<div className="my-6 flex flex-row-reverse items-center justify-around">
-							<button
-								onClick={(event: SyntheticEvent<HTMLButtonElement>): void => {
-									event.preventDefault()
-									mainForm.mutate()
-								}}
-								className="btn btn-accent md:btn-lg"
-								disabled={mainForm.isPending}
-							>
-								Confirm and get started!
-							</button>
-							<button onClick={reset} className="btn btn-primary">
-								Reset page
-							</button>
-						</div>
-					:	<></>}
-				</div>
+		<main className="text-white p-4 @md:p-6 @lg:p-10 pb-10">
+			<h1 className="d1 @md:text-center">Welcome to Sunlo</h1>
+			<div className="w-app space-y-10">
+				<p className="my-4 mb-10 text-2xl @md:text-center">
+					Let&apos;s get started
+				</p>
+				<SetUsernameStep value={tempUsernameToUse} set={setTempUsername} />
+				<SetPrimaryLanguageStep
+					value={tempLanguagePrimaryToUse}
+					set={setTempLanguagePrimary}
+				/>
+				<CreateFirstDeckStep value={tempDeckToAdd} set={setTempDeckToAdd} />
+				{(
+					tempLanguagePrimaryToUse &&
+					(tempDeckToAdd || deckLanguages?.length > 0) &&
+					tempUsernameToUse
+				) ?
+					<div className="flex flex-col @md:flex-row items-center md:justify-between gap-4">
+						<Button
+							onClick={(event: SyntheticEvent<HTMLButtonElement>): void => {
+								event.preventDefault()
+								mainForm.mutate()
+							}}
+							size="lg"
+							disabled={mainForm.isPending}
+						>
+							Confirm and get started!
+						</Button>
+						<Button
+							onClick={reset}
+							disabled={mainForm.isPending}
+							variant="outline"
+						>
+							Reset page
+						</Button>
+					</div>
+				:	<></>}
+				{!profile.data?.uid ? null : (
+					<div className="text-center @md:text-start">
+						<Link to="/profile" className="s-link text-xl" tabIndex={-1}>
+							<ArrowLeftIcon className="inline-block w-4 h-4 ml-1" />
+							Back to profile page
+						</Link>
+					</div>
+				)}
 				<ShowError show={!!mainForm?.error}>
 					Problem inserting profile or making deck:{' '}
 					{mainForm?.error?.message || 'unknown error, sorry. call m.'}
 				</ShowError>
-			</main>
-		</>
+			</div>
+		</main>
 	)
 }
 
@@ -155,21 +168,30 @@ function ShowSuccess({ tempDeckToAdd }: { tempDeckToAdd?: string }) {
 				<SuccessCheckmark />
 				<h1 className="h1">You&apos;re all set!</h1>
 			</div>
-			<div className="flex flex-col space-y-4">
+			<div className="space-y-4 text-center">
 				{typeof tempDeckToAdd === 'string' ?
-					<Link
-						to={`/learn/$lang`}
-						params={{ lang: tempDeckToAdd }}
-						from={Route.fullPath}
-						className="btn btn-secondary mx-auto"
-					>
-						Get started learning {languages[tempDeckToAdd]}
-						&nbsp;&rarr;
-					</Link>
+					<p>
+						<Link
+							to={`/learn/$lang`}
+							params={{ lang: tempDeckToAdd }}
+							from={Route.fullPath}
+							className={buttonVariants({ variant: 'action', size: 'lg' })}
+						>
+							Get started learning {languages[tempDeckToAdd]}
+							<ArrowRightIcon className="w-4 h-4 ml-2" />
+						</Link>
+					</p>
 				:	null}
-				<Link to="/profile" className="btn btn-ghost mx-auto">
-					Go to your profile&nbsp;&rarr;
-				</Link>
+				<p>
+					<Link
+						to="/profile"
+						from={Route.fullPath}
+						className={buttonVariants({ variant: 'outline' })}
+					>
+						Go to your profile
+						<ArrowRightIcon className="w-4 h-4 ml-2" />
+					</Link>
+				</p>
 			</div>
 		</main>
 	)
@@ -190,7 +212,7 @@ const SetPrimaryLanguageStep = ({ value, set }: SetValueStepProps) => {
 				<X set={() => setClosed(false)} />
 			</Completed>
 		:	<form
-				className="card-white mb-16"
+				className="card-white"
 				onSubmit={(e: FormEvent<HTMLFormElement>) => {
 					e.preventDefault()
 					setClosed(true)
@@ -200,7 +222,7 @@ const SetPrimaryLanguageStep = ({ value, set }: SetValueStepProps) => {
 			>
 				<h2 className="h2">Set primary language</h2>
 				<div className="flex flex-col">
-					<label className="py-2 font-bold">The language you know best</label>
+					<Label className="py-2 font-bold">The language you know best</Label>
 					<select
 						value={value || ''}
 						name="language_primary"
@@ -265,7 +287,7 @@ const CreateFirstDeckStep = ({ value, set }: SetValueStepProps) => {
 					}}
 				/>
 			</Completed>
-		:	<form className="card-white mb-16">
+		:	<form className="card-white">
 				<h2 className="h2">
 					Create {langs.length === 0 ? 'your first deck' : 'another deck'}
 				</h2>
@@ -276,9 +298,7 @@ const CreateFirstDeckStep = ({ value, set }: SetValueStepProps) => {
 					</p>
 				:	null}
 				<div className="flex flex-col">
-					<label className="py-2 font-bold">
-						The language you want to learn
-					</label>
+					<Label>The language you want to learn</Label>
 					<select
 						value={value || ''}
 						name="language_primary"
@@ -322,7 +342,7 @@ const SetUsernameStep = ({ value, set }: SetValueStepProps) => {
 				<X set={() => setClosed(false)} />
 			</Completed>
 		:	<form
-				className="card-white mb-16"
+				className="card-white"
 				onSubmit={(e: FormEvent<HTMLFormElement>) => {
 					e.preventDefault()
 					// @ts-expect-error
@@ -331,12 +351,9 @@ const SetUsernameStep = ({ value, set }: SetValueStepProps) => {
 			>
 				<h2 className="h2">Pick a username</h2>
 				<div className="flex flex-col">
-					<label className="py-2 font-bold">
-						Username for your public profile
-					</label>
-					<input
+					<Label>Username for your public profile</Label>
+					<Input
 						type="text"
-						className="s-input"
 						name="username"
 						placeholder="Lernie McSanders"
 						value={value || ''}
@@ -345,9 +362,9 @@ const SetUsernameStep = ({ value, set }: SetValueStepProps) => {
 						}}
 					/>
 				</div>
-				<button className="btn btn-ghost my-4" type="submit">
-					Do the thing
-				</button>
+				<Button className="my-4" variant="default" type="submit">
+					Continue
+				</Button>
 			</form>
 }
 
@@ -357,28 +374,15 @@ interface XProps {
 }
 
 const X = ({ set, plus = false }: XProps) => (
-	<button
+	<Button
 		onClick={() => set()}
-		className={cn(
-			'btn btn-ghost block flex-none rounded-full',
-			plus ? 'rotate-45' : ''
-		)}
+		size="icon"
+		variant="ghost"
+		asChild
+		className="h-10 w-10 p-2"
 	>
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			className="h-4 w-4 text-white"
-			fill="none"
-			viewBox="0 0 24 24"
-			stroke="currentColor"
-		>
-			<path
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				strokeWidth={2}
-				d="M6 18L18 6M6 6l12 12"
-			/>
-		</svg>
-	</button>
+		<PlusIcon className={plus ? '' : 'rotate-45'} />
+	</Button>
 )
 
 const Completed = ({ children }: { children: Array<ReactNode> }) => (

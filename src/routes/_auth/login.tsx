@@ -1,21 +1,17 @@
-import { type FormEvent, useEffect } from 'react'
-import {
-	createFileRoute,
-	useNavigate,
-	useSearch,
-	Link,
-} from '@tanstack/react-router'
+import { useLayoutEffect } from 'react'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
+import { z } from 'zod'
+import { useForm } from '@tanstack/react-form'
+import { zodValidator } from '@tanstack/zod-form-adapter'
 import toast from 'react-hot-toast'
 
+import { Input } from 'components/ui/input'
+import { Button, buttonVariants } from 'components/ui/button'
 import supabase from 'lib/supabase-client'
-import { cn } from 'lib/utils'
 import { useAuth } from 'lib/hooks'
 import { ShowError } from 'components/errors'
-
-interface LoginSearchParams {
-	redirectedFrom?: string
-}
+import { LabelInputInfo } from 'components/LabelInputInfo'
 
 export const Route = createFileRoute('/_auth/login')({
 	validateSearch: (search: Record<string, unknown>): LoginSearchParams => {
@@ -26,13 +22,24 @@ export const Route = createFileRoute('/_auth/login')({
 	component: LoginForm,
 })
 
+interface LoginSearchParams {
+	redirectedFrom?: string
+}
+
+const LoginSchema = z.object({
+	email: z.string().email(),
+	password: z
+		.string()
+		.min(8, { message: 'Password must be at least 8 characters' }),
+})
+
 export default function LoginForm() {
 	const { isAuth } = useAuth()
 	const navigate = Route.useNavigate()
 	const { redirectedFrom } = Route.useSearch()
 	const fromPath = Route.fullPath
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		if (isAuth && navigate) {
 			void navigate({
 				to: redirectedFrom || '/learn',
@@ -41,96 +48,127 @@ export default function LoginForm() {
 		}
 	}, [isAuth, navigate, redirectedFrom, fromPath])
 
-	const useLogin = useMutation({
-		mutationFn: async (formData: FormData) => {
-			const email = formData.get('email') as string
-			const password = formData.get('password') as string
+	const loginMutation = useMutation({
+		mutationKey: ['login'],
+		mutationFn: async (values: z.infer<typeof LoginSchema>) => {
 			const { data, error } = await supabase.auth.signInWithPassword({
-				email,
-				password,
+				email: values.email,
+				password: values.password,
 			})
 			if (error) throw error
-			return data.user.email
+			return data.user?.email
 		},
-		onSuccess: (email: string) => {
-			toast.success(`Logged in as ${email}`, { position: 'bottom-center' })
+		onSuccess: (email: string | undefined) => {
+			if (email) {
+				toast.success(`Logged in as ${email}`, { position: 'bottom-center' })
+			}
+			// we don't need to redirect here, because the useEffect will do that
 		},
 	})
-	// console.log(`what is auth rn`, auth.isAuth, auth)
 
-	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-		event.preventDefault()
-		const formData = new FormData(event.currentTarget)
-		useLogin.mutate(formData)
-	}
+	const form = useForm<z.infer<typeof LoginSchema>>({
+		defaultValues: {
+			email: '',
+			password: '',
+		},
+		onSubmit: ({ value }) => loginMutation.mutate(value),
+		validatorAdapter: zodValidator(),
+		validators: {
+			onSubmit: LoginSchema,
+			onChange: LoginSchema,
+		},
+	})
 
-	if (isAuth) return <p>You are logged in; pls wait while we redirect you.</p>
+	if (isAuth)
+		return <p>You are logged in; please wait while we redirect you.</p>
+	console.log('form state', form.state, loginMutation)
+	const submitButtonShouldBeDisabled =
+		loginMutation.isPending ||
+		form.state.isSubmitting ||
+		(form.state.isTouched && Object.keys(form.state.errors).length > 0)
 
 	return (
 		<>
 			<h1 className="h3 text-base-content/90">Please log in</h1>
-			<form role="form" onSubmit={handleSubmit} className="form">
+			<form
+				role="form"
+				onSubmit={(event) => {
+					event.preventDefault()
+					event.stopPropagation()
+					form.handleSubmit()
+				}}
+				noValidate
+			>
 				<fieldset
 					className="flex flex-col gap-y-4"
-					disabled={useLogin.isPending}
+					disabled={loginMutation.isPending}
 				>
-					<div>
-						<label htmlFor="email">Email</label>
-						<input
-							id="email"
-							name="email"
-							required={true}
-							pattern="[^@\s]+@[^@\s]+\.[^@\s]+"
-							// pattern = "[a-zA-Z0-9.+_-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+"
-							// aria-invalid={login.error?.email ? true : false}
-							className={cn(
-								// login.error?.email ? 'border-error/60' : '',
-								's-input'
-							)}
-							tabIndex={1}
-							type="email"
-							placeholder="email@domain"
-						/>
-					</div>
-					<div>
-						<p>
-							<label htmlFor="password">Password</label>
-						</p>
-						<input
-							id="password"
-							name="password"
-							required={true}
-							// aria-invalid={login.error?.password ? 'true' : 'false'}
-							className={cn(
-								's-input'
-								// login.error?.password ? 'border-error/60' : ''
-							)}
-							tabIndex={2}
-							type="password"
-							placeholder="* * * * * * * *"
-						/>
-					</div>
+					<form.Field
+						name="email"
+						children={(field) => {
+							const showAsError =
+								field.state.meta.errors.length > 0 && field.state.meta.isDirty
+							return (
+								<LabelInputInfo field={field} label="Email">
+									<Input
+										id={field.name}
+										name={field.name}
+										inputMode="email"
+										aria-invalid={showAsError}
+										className={showAsError ? 'bg-error/20' : ''}
+										tabIndex={1}
+										type="email"
+										onChange={(e) => field.handleChange(e.target.value)}
+										placeholder="email@domain"
+									/>
+								</LabelInputInfo>
+							)
+						}}
+					/>
+					<form.Field
+						name="password"
+						children={(field) => {
+							const showAsError =
+								field.state.meta.errors.length > 0 && field.state.meta.isDirty
+							return (
+								<LabelInputInfo field={field} label="Password">
+									<Input
+										id={field.name}
+										name={field.name}
+										inputMode="text"
+										required={true}
+										aria-invalid={field.state.meta.errors.length > 0}
+										className={showAsError ? 'bg-error/20' : ''}
+										tabIndex={2}
+										type="password"
+										onChange={(e) => field.handleChange(e.target.value)}
+										placeholder="* * * * * * * *"
+									/>
+								</LabelInputInfo>
+							)
+						}}
+					/>
 					<div className="flex flex-row justify-between">
-						<button
+						<Button
 							tabIndex={3}
-							className="btn btn-primary"
+							variant="default"
 							type="submit"
-							disabled={useLogin.isPending}
-							aria-disabled={useLogin.isPending}
+							disabled={submitButtonShouldBeDisabled}
+							aria-disabled={submitButtonShouldBeDisabled}
 						>
 							Log in
-						</button>
+						</Button>
+
 						<Link
-							tabIndex={4}
 							to="/signup"
 							from={Route.fullPath}
-							className="btn btn-ghost"
+							className={buttonVariants({ variant: 'soft' })}
 						>
 							Create account
 						</Link>
 					</div>
-					<ShowError show={!!useLogin.error}>
-						Problem logging in: {useLogin.error?.message}
+					<ShowError show={!!loginMutation.error}>
+						Problem logging in: {loginMutation.error?.message}
 					</ShowError>
 					<p>
 						<Link

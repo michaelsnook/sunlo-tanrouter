@@ -66,6 +66,9 @@
 		padding-top: env(safe-area-inset-top);
 		padding-bottom: env(safe-area-inset-bottom);
 	}
+	main {
+		@apply px-1;
+	}
 }
 
 @layer components {
@@ -94,9 +97,6 @@
 	.page-card > .h1,
 	.page-card > .h2 {
 		@apply text-base-content/90;
-	}
-	.s-input {
-		@apply w-full rounded bg-base-100 px-3 text-base-content ring-1 focus-within:ring-1;
 	}
 }
 @layer utilities {

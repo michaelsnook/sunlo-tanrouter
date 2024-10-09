@@ -1,22 +1,32 @@
-import { createLazyFileRoute } from '@tanstack/react-router'
-
-import { Link } from '@tanstack/react-router'
+import { Link, createLazyFileRoute, useRouter } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
-import { cn } from 'lib/utils'
-import { ShowError } from 'components/errors'
-import supabase from 'lib/supabase-client'
-import { Session } from 'inspector/promises'
+import { useForm } from '@tanstack/react-form'
+import { z } from 'zod'
+import { zodValidator } from '@tanstack/zod-form-adapter'
 import toast from 'react-hot-toast'
+
+import { Button, buttonVariants } from 'components/ui/button'
+import { Input } from 'components/ui/input'
+import { Label } from 'components/ui/label'
+
+import supabase from 'lib/supabase-client'
+import { ShowError } from 'components/errors'
+import { LabelInputInfo } from 'components/LabelInputInfo'
 
 export const Route = createLazyFileRoute('/_auth/signup')({
 	component: SignUp,
 })
 
-function SignUp() {
-	const useSignUp = useMutation({
-		mutationFn: async (formData: FormData) => {
-			const email = formData.get('email') as string
-			const password = formData.get('password') as string
+const SignUpSchema = z.object({
+	email: z.string().email('Invalid email address'),
+	password: z.string().min(8, 'Password must be at least 8 characters'),
+})
+
+const useSignUp = () =>
+	useMutation({
+		mutationKey: ['signup'],
+		mutationFn: async (values: z.infer<typeof SignUpSchema>) => {
+			const { email, password } = SignUpSchema.parse(values)
 			const { data, error } = await supabase.auth.signUp({
 				email,
 				password,
@@ -24,77 +34,127 @@ function SignUp() {
 					emailRedirectTo: `${import.meta.env.VITE_BASE_URL}/getting-started`,
 				},
 			})
-			if (error) throw error
+			if (error) {
+				console.log(`Error`, error)
+				throw error
+			}
 			return data
 		},
 		onSuccess: (data) => {
-			toast.success(`Signed up as ${data.user?.email}`, {
+			toast.success(`as ${data.user?.email}`, {
 				position: 'bottom-center',
 			})
-			// Redirect to the getting-started page after successful signup
-			const navigate = Route.useNavigate()
-			navigate({ to: '/getting-started' })
 		},
 	})
 
-	const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-		e.preventDefault()
-		const formData = new FormData(e.currentTarget)
-		useSignUp.mutate(formData)
-	}
+function SignUp() {
+	const router = useRouter()
+	const signupMutation = useSignUp()
+
+	const form = useForm<z.infer<typeof SignUpSchema>>({
+		defaultValues: {
+			email: '',
+			password: '',
+		},
+		validatorAdapter: zodValidator(),
+		validators: {
+			onSubmit: SignUpSchema,
+			onChange: SignUpSchema,
+		},
+		onSubmit: ({ value }) => {
+			signupMutation.mutate(value, {
+				onSuccess: (data) => {
+					toast.success(`Signed up as ${data.user?.email}`, {
+						position: 'bottom-center',
+					})
+					router.navigate({ to: '/getting-started', from: '/signup' })
+				},
+			})
+		},
+	})
 
 	return (
 		<>
 			<h1 className="h3 text-base-content/90">Sign Up</h1>
-			<form role="form" className="form" onSubmit={handleSubmit}>
+			<form
+				role="form"
+				className="form"
+				onSubmit={(e) => {
+					e.preventDefault()
+					e.stopPropagation()
+					form.handleSubmit()
+				}}
+				noValidate
+			>
 				<fieldset
 					className="flex flex-col gap-y-4"
-					disabled={useSignUp.isPending}
+					disabled={signupMutation.isPending}
 				>
-					<div>
-						<p>
-							<label htmlFor="email">Email</label>
-						</p>
-						<input
-							id="email"
-							name="email"
-							required={true}
-							className={cn('s-input')}
-							tabIndex={1}
-							type="email"
-							placeholder="email@domain"
-						/>
-					</div>
-					<div>
-						<p>
-							<label htmlFor="password">Password</label>
-						</p>
-						<input
-							id="password"
-							name="password"
-							required={true}
-							className={cn('s-input')}
-							tabIndex={2}
-							type="password"
-							placeholder="* * * * * * * *"
-						/>
-					</div>
+					<form.Field
+						name="email"
+						children={(field) => {
+							const showAsError =
+								field.state.meta.errors.length > 0 && field.state.meta.isDirty
+							return (
+								<LabelInputInfo field={field} label="Email">
+									<Input
+										id={field.name}
+										name={field.name}
+										inputMode="email"
+										aria-invalid={showAsError}
+										className={showAsError ? 'bg-error/20' : ''}
+										required={true}
+										tabIndex={1}
+										type="email"
+										onChange={(e) => field.handleChange(e.target.value)}
+										placeholder="email@domain"
+									/>
+								</LabelInputInfo>
+							)
+						}}
+					/>
+					<form.Field
+						name="password"
+						children={(field) => {
+							const showAsError =
+								field.state.meta.errors.length > 0 && field.state.meta.isDirty
+							return (
+								<LabelInputInfo field={field} label="Password">
+									<Input
+										id={field.name}
+										name={field.name}
+										aria-invalid={showAsError}
+										className={showAsError ? 'bg-error/20' : ''}
+										required={true}
+										tabIndex={2}
+										type="password"
+										onChange={(e) => field.handleChange(e.target.value)}
+										placeholder="* * * * * * * *"
+									/>
+								</LabelInputInfo>
+							)
+						}}
+					/>
 					<div className="flex flex-row justify-between">
-						<button
+						<Button
 							tabIndex={3}
-							className="btn btn-primary"
+							variant="default"
 							type="submit"
-							disabled={useSignUp.isPending}
-							aria-disabled={useSignUp.isPending}
+							disabled={signupMutation.isPending}
+							aria-disabled={signupMutation.isPending}
 						>
 							Sign Up
-						</button>
-						<Link tabIndex={4} to="/login" className="btn btn-ghost">
+						</Button>
+						<Link
+							tabIndex={4}
+							to="/login"
+							className={buttonVariants({ variant: 'soft' })}
+						>
 							Already have an account?
 						</Link>
 					</div>
-					<ShowError show={!!useSignUp.error}>
-						Problem signing up: {useSignUp.error?.message}
+					<ShowError show={!!signupMutation.error}>
+						Problem signing up: {signupMutation.error?.message}
 					</ShowError>
 				</fieldset>
 			</form>

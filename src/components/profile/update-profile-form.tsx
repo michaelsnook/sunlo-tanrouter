@@ -20,7 +20,6 @@ import AvatarEditor from './avatar-editor'
 import SelectMultipleLanguagesInput from 'components/select-multiple-languages'
 import { SelectOneLanguage } from 'components/select-one-language'
 import { FieldInfo } from 'components/field-info'
-import { cn } from 'lib/utils'
 
 const profileEditFormSchema = z.object({
 	username: z
@@ -77,7 +76,7 @@ function PrefilledForm({ initialData, uid }: PrefilledFormProps) {
 		},
 	})
 
-	const form = useForm({
+	const form = useForm<z.infer<typeof profileEditFormSchema>>({
 		defaultValues: initialData,
 		onSubmit: ({ value }) => {
 			// Do something with form data
@@ -109,15 +108,14 @@ function PrefilledForm({ initialData, uid }: PrefilledFormProps) {
 					name="username"
 					children={(field) => (
 						<div className="flex flex-col">
-							<Label htmlFor="username">Your nickname</Label>
+							<Label htmlFor={field.name}>Your nickname</Label>
 							<Input
 								type="text"
 								tabIndex={1}
-								className={cn(
-									's-input',
+								className={
 									!!field.state.meta.errors.length &&
-										'border-error outline-error ring-error forcus:ring-error'
-								)}
+									'border-error outline-error ring-error forcus:ring-error'
+								}
 								id={field.name}
 								name={field.name}
 								value={field.state.value}
@@ -132,7 +130,7 @@ function PrefilledForm({ initialData, uid }: PrefilledFormProps) {
 					name="language_primary"
 					children={(field) => (
 						<div className="flex flex-col">
-							<Label htmlFor="language_primary" className="font-bold">
+							<Label htmlFor={field.name} className="font-bold">
 								Primary language
 							</Label>
 							<SelectOneLanguage
@@ -149,7 +147,7 @@ function PrefilledForm({ initialData, uid }: PrefilledFormProps) {
 					name="languages_spoken"
 					children={(field) => (
 						<div className="flex flex-col">
-							<Label htmlFor="languages_spoken" className="font-bold">
+							<Label htmlFor={field.name} className="font-bold">
 								Do you know other languages?
 							</Label>
 							<SelectMultipleLanguagesInput
